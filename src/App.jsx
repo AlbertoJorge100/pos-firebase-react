@@ -1,11 +1,26 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import heroImg from './assets/hero.png'
 import reactLogo from './assets/react.svg'
 import viteLogo from './assets/vite.svg'
+import {supabase} from './lib/supabaseClient'
 import './App.css'
 
 function App() {
   const [count, setCount] = useState(0)
+  useEffect(() => {
+        async function testConnection() {
+            const { data, error } = await supabase
+                .from('pos_products')
+                .select('*')
+                .limit(5);
+
+            console.log('Data:', data);
+            console.log('Error:', error);
+        }
+
+        testConnection();
+    }, []);
+
 
   return (
     <>
