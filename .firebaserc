@@ -1,5 +1,15 @@
 {
   "projects": {
-    "default": "pos-system01"
-  }
+    "default": "alberto-a0209"
+  },
+  "targets": {
+    "alberto-a0209": {
+      "hosting": {
+        "principal": [
+          "iglesia-israelita-cristocentrica"
+        ]
+      }
+    }
+  },
+  "etags": {}
 }
