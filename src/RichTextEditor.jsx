@@ -51,6 +51,7 @@ function plainTextToHtml(value) {
 
 function RichTextEditor({ value, onChange }) {
   const lastSyncedValue = useRef(value || '')
+  const sourceEditorRef = useRef(null)
   const [isSourceMode, setIsSourceMode] = useState(false)
   const [sourceValue, setSourceValue] = useState(value || '')
   const editor = useEditor({
@@ -103,6 +104,13 @@ function RichTextEditor({ value, onChange }) {
     lastSyncedValue.current = nextValue
     editor.commands.setContent(nextValue, { emitUpdate: false })
   }, [editor, isSourceMode, value])
+
+  useEffect(() => {
+    const sourceEditor = sourceEditorRef.current
+    if (!isSourceMode || !sourceEditor) return
+    sourceEditor.style.height = 'auto'
+    sourceEditor.style.height = `${sourceEditor.scrollHeight}px`
+  }, [isSourceMode, sourceValue])
 
   if (!editor) return <div className="rich-text-editor rich-text-editor--loading" aria-busy="true" />
 
@@ -259,6 +267,7 @@ function RichTextEditor({ value, onChange }) {
       </div>
       {isSourceMode ? (
         <textarea
+          ref={sourceEditorRef}
           className="rich-editor-source"
           aria-label="Código HTML del contenido"
           spellCheck="false"

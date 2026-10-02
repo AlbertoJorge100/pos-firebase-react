@@ -10,6 +10,22 @@ const getSectionKey = (viewId, sectionId) => `${viewId}:${sectionId}`
 const getSectionElementId = (viewId, sectionId) => `section-${viewId}-${sectionId}`
 const CompanyId = import.meta.env.VITE_COMPANY_ID;
 const isAdminPath = (pathname) => /^\/admin\/?$/.test(pathname)
+const normalizeSectionImages = (images) => (
+  Array.isArray(images)
+    ? images.flatMap((image) => {
+      if (typeof image === 'string' && image.trim()) {
+        return [{ title: '', url: image.trim() }]
+      }
+      if (image && typeof image === 'object' && typeof image.url === 'string' && image.url.trim()) {
+        return [{ title: typeof image.title === 'string' ? image.title : '', url: image.url.trim() }]
+      }
+      return []
+    })
+    : []
+)
+
+const getPointerDistance = (first, second) => Math.hypot(second.x - first.x, second.y - first.y)
+const clampZoom = (scale) => Math.min(5, Math.max(1, scale))
 
 function App() {
   const [views, setViews] = useState([])
@@ -23,6 +39,8 @@ function App() {
   const [isAdminRoute, setIsAdminRoute] = useState(() => isAdminPath(window.location.pathname))
   const [isAuthLoading, setIsAuthLoading] = useState(true)
   const [lightboxImage, setLightboxImage] = useState(null)
+  const [lightboxZoom, setLightboxZoom] = useState({ scale: 1, x: 0, y: 0 })
+  const lightboxZoomRef = useRef(lightboxZoom)
   const sectionNavigationRef = useRef(false)
   const scrollResumeTimerRef = useRef(null)
   const pendingSectionScrollRef = useRef(null)
@@ -30,8 +48,12 @@ function App() {
   const sectionNavRef = useRef(null)
   const lightboxCloseRef = useRef(null)
   const lightboxTriggerRef = useRef(null)
+  const lightboxViewportRef = useRef(null)
+  const lightboxPointersRef = useRef(new Map())
+  const lightboxGestureRef = useRef(null)
   const activeView = views.find((view) => view.id === activeViewId) ?? views[0] ?? null
   const [company, setCompany] = useState({});
+  lightboxZoomRef.current = lightboxZoom
 
   useEffect(() => {
     let active = true
@@ -88,19 +110,23 @@ function App() {
             description,
             button_title,
             footer,
+            position,
             blog_sections (
               id,
               title,
               text,
               button_title,
-              images
+              images,
+              position
             )
           )
         `)
         .eq('id', CompanyId)
         .eq('blog_views.is_active', true)
         .eq('blog_views.blog_sections.is_active', true)
+        .order('position', { referencedTable: 'blog_views', ascending: true })
         .order('id', { referencedTable: 'blog_views', ascending: true })
+        .order('position', { referencedTable: 'blog_views.blog_sections', ascending: true })
         .order('id', { referencedTable: 'blog_views.blog_sections', ascending: true })
         .maybeSingle(); 
       if (cancelled) return
@@ -119,9 +145,7 @@ function App() {
           title: section.title ?? '',
           text: section.text ?? '',
           buttonTitle: section.button_title ?? '',
-          images: Array.isArray(section.images)
-            ? section.images.filter((image) => typeof image === 'string' && image.trim())
-            : [],
+          images: normalizeSectionImages(section.images),
         })),
       }));
       delete data.blog_views;
@@ -149,8 +173,20 @@ function App() {
   useEffect(() => {
     if (!lightboxImage) return undefined
 
+    lightboxPointersRef.current.clear()
+    lightboxGestureRef.current = null
     const previousOverflow = document.body.style.overflow
+    const viewport = lightboxViewportRef.current
+    const handleWheel = (event) => {
+      event.preventDefault()
+      zoomAtPoint(
+        lightboxZoomRef.current.scale + (event.deltaY < 0 ? 0.25 : -0.25),
+        event.clientX,
+        event.clientY,
+      )
+    }
     document.body.style.overflow = 'hidden'
+    viewport?.addEventListener('wheel', handleWheel, { passive: false })
     lightboxCloseRef.current?.focus()
 
     const handleKeyDown = (event) => {
@@ -160,10 +196,103 @@ function App() {
     window.addEventListener('keydown', handleKeyDown)
     return () => {
       document.body.style.overflow = previousOverflow
+      viewport?.removeEventListener('wheel', handleWheel)
       window.removeEventListener('keydown', handleKeyDown)
       if (lightboxTriggerRef.current?.isConnected) lightboxTriggerRef.current.focus()
     }
   }, [lightboxImage])
+
+  function zoomAtPoint(nextScale, clientX, clientY) {
+    const viewport = lightboxViewportRef.current
+    if (!viewport) return
+
+    const bounds = viewport.getBoundingClientRect()
+    const pointX = clientX - bounds.left - bounds.width / 2
+    const pointY = clientY - bounds.top - bounds.height / 2
+    setLightboxZoom((current) => {
+      const scale = clampZoom(nextScale)
+      if (scale === 1) return { scale: 1, x: 0, y: 0 }
+      const imageX = (pointX - current.x) / current.scale
+      const imageY = (pointY - current.y) / current.scale
+      return {
+        scale,
+        x: pointX - imageX * scale,
+        y: pointY - imageY * scale,
+      }
+    })
+  }
+
+  function zoomBy(amount) {
+    const viewport = lightboxViewportRef.current
+    if (!viewport) return
+    const bounds = viewport.getBoundingClientRect()
+    zoomAtPoint(lightboxZoom.scale + amount, bounds.left + bounds.width / 2, bounds.top + bounds.height / 2)
+  }
+
+  function handleLightboxPointerDown(event) {
+    if (event.pointerType === 'mouse' && event.button !== 0) return
+    const viewport = lightboxViewportRef.current
+    if (!viewport) return
+    viewport.setPointerCapture(event.pointerId)
+    lightboxPointersRef.current.set(event.pointerId, { x: event.clientX, y: event.clientY })
+
+    const pointers = [...lightboxPointersRef.current.values()]
+    if (pointers.length >= 2) {
+      lightboxGestureRef.current = {
+        type: 'pinch',
+        distance: getPointerDistance(pointers[0], pointers[1]),
+        scale: lightboxZoom.scale,
+      }
+    } else if (lightboxZoom.scale > 1) {
+      lightboxGestureRef.current = {
+        type: 'pan',
+        pointerX: event.clientX,
+        pointerY: event.clientY,
+        x: lightboxZoom.x,
+        y: lightboxZoom.y,
+      }
+    } else {
+      lightboxGestureRef.current = null
+    }
+  }
+
+  function handleLightboxPointerMove(event) {
+    if (!lightboxPointersRef.current.has(event.pointerId)) return
+    lightboxPointersRef.current.set(event.pointerId, { x: event.clientX, y: event.clientY })
+    const pointers = [...lightboxPointersRef.current.values()]
+    const gesture = lightboxGestureRef.current
+
+    if (pointers.length >= 2 && gesture?.type === 'pinch') {
+      const distance = getPointerDistance(pointers[0], pointers[1])
+      if (gesture.distance === 0) return
+      const scale = clampZoom(gesture.scale * distance / gesture.distance)
+      setLightboxZoom((current) => ({ ...current, scale }))
+      return
+    }
+
+    if (gesture?.type === 'pan' && pointers.length === 1) {
+      setLightboxZoom((current) => ({
+        ...current,
+        x: gesture.x + event.clientX - gesture.pointerX,
+        y: gesture.y + event.clientY - gesture.pointerY,
+      }))
+    }
+  }
+
+  function handleLightboxPointerUp(event) {
+    lightboxPointersRef.current.delete(event.pointerId)
+    lightboxGestureRef.current = null
+    if (lightboxPointersRef.current.size === 1 && lightboxZoom.scale > 1) {
+      const [pointer] = lightboxPointersRef.current.values()
+      lightboxGestureRef.current = {
+        type: 'pan',
+        pointerX: pointer.x,
+        pointerY: pointer.y,
+        x: lightboxZoom.x,
+        y: lightboxZoom.y,
+      }
+    }
+  }
 
   useEffect(() => {
     const sectionKey = pendingSectionScrollRef.current
@@ -333,10 +462,16 @@ function App() {
   }
 
   function navigateToAdmin() {
+    if(window.innerWidth <= 450) return;
     if (!isAdminPath(window.location.pathname)) {
       window.history.pushState({}, '', '/admin')
     }
     setIsAdminRoute(true)
+  }
+
+  function openAdminInNewTab() {
+    if (window.innerWidth <= 450) return
+    window.open('/admin', '_blank', 'noopener,noreferrer')
   }
 
   function navigateToHome() {
@@ -409,7 +544,7 @@ function App() {
   return (
     <div className="site-shell">
       <header className="topbar">
-        <button className="brand" type="button" onClick={navigateToAdmin} aria-label="Abrir administración">
+        <button className="brand" type="button" onDoubleClick={openAdminInNewTab} aria-label="Abrir administración">
           {/* <span className="brand-mark" aria-hidden="true">e.</span> */}
           <img src={company.logo} alt="" width={30} />
           <span className="brand-name">{company.title}</span>
@@ -453,7 +588,7 @@ function App() {
               )
             })}
           </nav>
-          <div className="sidebar-foot"><span className="status-dot" /> COMUNIDAD ABIERTA</div>
+          <div className="sidebar-foot"><span className="status-dot" /> {company.title}</div>
         </aside>
 
         <main className="page-content" ref={contentRef}>
@@ -499,19 +634,20 @@ function App() {
                               aria-label={`Ampliar imagen ${imageIndex + 1} de ${section.title}`}
                               onClick={(event) => {
                                 lightboxTriggerRef.current = event.currentTarget
+                                setLightboxZoom({ scale: 1, x: 0, y: 0 })
                                 setLightboxImage({
-                                  src: image,
-                                  alt: `${section.title} - imagen ${imageIndex + 1}`,
+                                  src: image.url,
+                                  alt: image.title || `${section.title} - imagen ${imageIndex + 1}`,
                                 })
                               }}
                             >
                               <img
-                                src={image}
-                                alt={`${section.title} - imagen ${imageIndex + 1}`}
+                                src={image.url}
+                                alt={image.title || `${section.title} - imagen ${imageIndex + 1}`}
                                 loading="lazy"
                               />
                             </button>
-                            <figcaption><span>{section.title}</span><span>{imageIndex + 1} / {section.images.length}</span></figcaption>
+                            <figcaption><span>{image.title || section.title}</span><span>{imageIndex + 1} / {section.images.length}</span></figcaption>
                           </figure>
                         ))}
                       </div>
@@ -544,8 +680,8 @@ function App() {
                 Escríbenos 
               </a>
               <div className="footer-bottom">
-                <span>© {new Date().getFullYear()} Espacio Común. Todos los derechos reservados.</span>
-                <span>Hecho para compartir ideas <span aria-hidden="true">✳</span></span>
+                <span>© {new Date().getFullYear()} {company.title}. Todos los derechos reservados.</span>
+                <span>Soluciones informaticas: jp_nolasco@outlook.com <span aria-hidden="true">✳</span></span>
               </div>
             </footer>
           </div>
@@ -568,8 +704,41 @@ function App() {
             >
               <span aria-hidden="true">×</span>
             </button>
-            <img src={lightboxImage.src} alt={lightboxImage.alt} />
-          </div>
+              <div
+                ref={lightboxViewportRef}
+                className={`lightbox-viewport${lightboxZoom.scale > 1 ? ' is-zoomed' : ''}`}
+                onPointerDown={handleLightboxPointerDown}
+                onPointerMove={handleLightboxPointerMove}
+                onPointerUp={handleLightboxPointerUp}
+                onPointerCancel={handleLightboxPointerUp}
+                onDoubleClick={(event) => {
+                  const bounds = lightboxViewportRef.current?.getBoundingClientRect()
+                  if (bounds) {
+                    const nextScale = lightboxZoom.scale > 1 ? 1 : 2
+                    zoomAtPoint(nextScale, event.clientX, event.clientY)
+                  }
+                }}
+                onDragStart={(event) => event.preventDefault()}
+              >
+                <img
+                  className="lightbox-image"
+                  src={lightboxImage.src}
+                  alt={lightboxImage.alt}
+                  draggable="false"
+                  style={{
+                    '--lightbox-zoom': lightboxZoom.scale,
+                    '--lightbox-x': `${lightboxZoom.x}px`,
+                    '--lightbox-y': `${lightboxZoom.y}px`,
+                  }}
+                />
+              </div>
+              <div className="lightbox-zoom-controls" aria-label="Controles de zoom">
+                <button type="button" onClick={() => zoomBy(0.5)} disabled={lightboxZoom.scale >= 5} aria-label="Acercar" title="Acercar">+</button>
+                <span aria-live="polite">{Math.round(lightboxZoom.scale * 100)}%</span>
+                <button type="button" onClick={() => zoomBy(-0.5)} disabled={lightboxZoom.scale <= 1} aria-label="Alejar" title="Alejar">−</button>
+                <button type="button" onClick={() => setLightboxZoom({ scale: 1, x: 0, y: 0 })} disabled={lightboxZoom.scale === 1} aria-label="Restablecer zoom" title="Restablecer zoom">↺</button>
+              </div>
+            </div>
         </div>
       )}
       {showScrollTop && (

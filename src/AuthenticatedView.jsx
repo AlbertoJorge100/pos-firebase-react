@@ -29,11 +29,11 @@ function AuthenticatedView({ session, onBack, onSignedOut }) {
     <main className="authenticated-page">
       <header className="authenticated-header">
         <button className="brand" type="button" onClick={onBack} aria-label="Volver a las vistas">
-          <span className="brand-mark" aria-hidden="true">e.</span>
+          <span className="brand-mark" aria-hidden="true">{"</>"}</span>
           <span className="brand-name">Administración</span>
         </button>
-        <button className="authenticated-back" type="button" onClick={onBack}>
-          <span aria-hidden="true">←</span> Volver al sitio
+        <button className="authenticated-back" type="button" onClick={handleSignOut}>
+          <span aria-hidden="true">←</span> {isSigningOut ? 'Cerrando sesión...' : 'Cerrar sesión'}
         </button>
       </header>
 
@@ -42,9 +42,9 @@ function AuthenticatedView({ session, onBack, onSignedOut }) {
 
         <BlogContentManager userEmail={session.user.email} />
 
-        <button className="authenticated-signout" type="button" onClick={handleSignOut} disabled={isSigningOut}>
+        {/* <button className="authenticated-signout" type="button" onClick={handleSignOut} disabled={isSigningOut}>
           {isSigningOut ? 'Cerrando sesión...' : 'Cerrar sesión'}
-        </button>
+        </button> */}
       </section>
     </main>
   )

@@ -24,6 +24,22 @@ function isAllowedIframeUrl(url) {
     return url.pathname === '/maps' && url.searchParams.get('output') === 'embed'
   }
 
+  if (
+    url.hostname === 'www.facebook.com'
+    && /^\/plugins\/(?:post|video|page)\.php$/.test(url.pathname)
+  ) {
+    const embeddedUrl = url.searchParams.get('href')
+    if (!embeddedUrl) return false
+
+    try {
+      const parsedEmbeddedUrl = new URL(embeddedUrl)
+      return parsedEmbeddedUrl.protocol === 'https:' || parsedEmbeddedUrl.protocol === 'http:'
+    } catch (error) {
+      if (error instanceof TypeError) return false
+      throw error
+    }
+  }
+
   return false
 }
 

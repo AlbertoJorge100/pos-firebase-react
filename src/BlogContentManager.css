@@ -1,7 +1,6 @@
 .content-manager {
-  margin: 54px 0 36px;
-  padding-top: 28px;
-  border-top: 1px solid var(--line);
+  margin: 38px 0 36px;
+  padding-top: 0;
 }
 
 .manager-heading {
@@ -161,6 +160,37 @@
 .manager-company-fields label:nth-child(2),
 .manager-company-fields label:nth-child(5) { grid-column: 1 / -1; }
 
+.manager-company-logo {
+  display: grid;
+  grid-column: 1 / -1;
+  justify-items: start;
+  gap: 8px;
+  color: #435248;
+  font-size: 10px;
+  font-weight: 650;
+}
+
+.manager-company-logo input {
+  max-width: 100%;
+  min-height: 38px;
+  padding: 6px;
+  color: var(--ink);
+  background: white;
+  border: 1px solid #d4ddd3;
+  border-radius: 2px;
+  font: inherit;
+  font-size: 11px;
+}
+
+.manager-company-logo-preview {
+  width: 120px;
+  height: 90px;
+  padding: 8px;
+  object-fit: contain;
+  background: white;
+  border: 1px solid var(--line);
+}
+
 .manager-form {
   display: grid;
   gap: 14px;
@@ -255,6 +285,13 @@
 .manager-primary-button:disabled { cursor: not-allowed; opacity: 0.55; }
 .manager-text-button { min-height: 30px; padding: 0 8px; font-size: 9px; }
 
+.manager-form > .manager-primary-button {
+  justify-self: start;
+  padding-right: 12px;
+  padding-left: 12px;
+  border-radius: 5px;
+}
+
 .manager-list { min-width: 0; }
 .manager-list-heading {
   min-height: 39px;
@@ -307,13 +344,99 @@
 .manager-empty { padding: 18px 0; border-top: 1px solid var(--line); }
 .manager-state { padding: 18px 0; }
 
+.manager-image-panel {
+  margin-top: 14px;
+  padding: 16px;
+  background: #f8faf7;
+  border: 1px solid var(--line);
+}
+
+.manager-image-upload {
+  display: grid;
+  grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr) auto;
+  align-items: end;
+  gap: 10px;
+  margin: 14px 0 18px;
+}
+
+.manager-visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  clip-path: inset(50%);
+}
+
+.manager-image-upload-button {
+  display: inline-grid;
+  width: 40px;
+  min-height: 38px;
+  padding: 0;
+  place-items: center;
+}
+
+.manager-image-upload-button svg {
+  width: 18px;
+  height: 18px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.8;
+}
+
+.manager-image-upload label,
+.manager-image-row label {
+  display: grid;
+  gap: 6px;
+  color: #435248;
+  font-size: 10px;
+  font-weight: 650;
+}
+
+.manager-image-upload input,
+.manager-image-row input {
+  width: 100%;
+  min-height: 38px;
+  padding: 8px 10px;
+  color: var(--ink);
+  background: white;
+  border: 1px solid #d4ddd3;
+  border-radius: 2px;
+  font: inherit;
+  font-size: 11px;
+}
+
+.manager-image-upload input[type='file'] { padding: 6px; }
+
+.manager-image-list { border-top: 1px solid var(--line); }
+
+.manager-image-row {
+  display: grid;
+  grid-template-columns: 64px minmax(120px, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.manager-image-row > img {
+  width: 64px;
+  height: 54px;
+  object-fit: cover;
+  background: #e8eee7;
+}
+
 @media (max-width: 900px) {
   .manager-layout,
   .manager-layout--sections { grid-template-columns: minmax(0, 1fr); }
+  .manager-image-upload { grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr) auto; }
 }
 
 @media (max-width: 520px) {
-  .content-manager { margin-top: 38px; padding-top: 22px; }
+  .content-manager { margin-top: 28px; padding-top: 0; }
   .manager-heading { align-items: flex-start; flex-direction: column; }
   .manager-row { grid-template-columns: minmax(0, 1fr); gap: 10px; }
   .manager-row-actions { justify-content: flex-start; }
@@ -323,4 +446,9 @@
   .manager-company-fields { grid-template-columns: minmax(0, 1fr); }
   .manager-company-fields label:nth-child(2),
   .manager-company-fields label:nth-child(5) { grid-column: auto; }
+  .manager-image-panel { padding: 12px; }
+  .manager-image-upload,
+  .manager-image-row { grid-template-columns: minmax(0, 1fr); }
+  .manager-image-row > img { width: 100%; height: 150px; }
+  .manager-image-upload-button { justify-self: end; }
 }
