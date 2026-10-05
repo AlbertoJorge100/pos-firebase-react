@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://iglesia-israelita-cristocentrica.web.app/sitemap.xml

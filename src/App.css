@@ -1,6 +1,6 @@
 .site-shell {
   width: 100%;
-  max-width: 1600px;
+  /* max-width: 1600px; */
   min-height: 100svh;
   margin: 0 auto;
   background: var(--paper);
